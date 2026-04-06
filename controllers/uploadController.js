@@ -51,13 +51,14 @@ const uploadPDF = async (req, res) => {
         console.log("Missing embedding at index:", i);
         continue;
       }
-
+      const useId=req.userId
       await pool.query(
         "INSERT INTO documents (content, document_name, embedding) VALUES ($1, $2, $3)",
         [
           chunks[i],
           req.file.originalname,
-          `[${embedding.join(",")}]`
+          `[${embedding.join(",")}]`,
+          useId
         ]
       );
     }

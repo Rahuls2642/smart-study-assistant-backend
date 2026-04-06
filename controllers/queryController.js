@@ -5,6 +5,7 @@ import { getAnswer } from "../services/llmServies.js";
 const queryDocuments = async (req, res) => {
   try {
     const {question}=req.body;
+    const useId=req.userId;
     if(!question){
         return res.status(400).json({error:"Question is required"});
     }
@@ -14,7 +15,7 @@ const queryDocuments = async (req, res) => {
    FROM documents
    ORDER BY embedding <-> $1
    LIMIT 5`,
-  [`[${questionEmbedding.join(",")}]`]
+  [`[${questionEmbedding.join(",")}]`,useId]
 );
     const context=result.rows.map(row=>row.content);
     const answer=await getAnswer(question,context);
