@@ -13,9 +13,10 @@ const queryDocuments = async (req, res) => {
    const result = await pool.query(
   `SELECT content
    FROM documents
+   WHERE user_id = $2
    ORDER BY embedding <-> $1
    LIMIT 5`,
-  [`[${questionEmbedding.join(",")}]`,useId]
+  [`[${questionEmbedding.join(",")}]`, useId] 
 );
     const context=result.rows.map(row=>row.content);
     const answer=await getAnswer(question,context);
