@@ -5,63 +5,50 @@ import { getEmbeddings } from "../services/embeddingServices.js";
 
 const uploadPDF = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    
+    // 1. Text Extraction
     const uint8Array = new Uint8Array(req.file.buffer);
     const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
     const pdf = await loadingTask.promise;
-
     let text = "";
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-
-      const strings = content.items.map(item => item.str);
+      // Added a filter to remove empty/whitespace items
+      const strings = content.items
+        .map(item => item.str)
+        .filter(str => str.trim() !== "");
       text += strings.join(" ") + "\n";
     }
 
-  
+    // 2. Chunking
     const chunks = chunkText(text);
+    if (!chunks.length) return res.status(400).json({ error: "PDF contains no readable text" });
 
-    if (!chunks.length) {
-      return res.status(400).json({ error: "No text extracted from PDF" });
-    }
-
-    console.log("Chunks:", chunks.length);
-
-  
+    // 3. Embedding Generation
     const embeddings = await getEmbeddings(chunks);
-
-    console.log("Embeddings:", embeddings.length);
-
-
     if (embeddings.length !== chunks.length) {
       throw new Error("Mismatch between chunks and embeddings");
     }
 
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = embeddings[i];
+    const userId = req.userId; 
 
-      if (!embedding) {
-        console.log("Missing embedding at index:", i);
-        continue;
-      }
-      const useId=req.userId
-      await pool.query(
-        "INSERT INTO documents (content, document_name, embedding) VALUES ($1, $2, $3)",
+    const insertPromises = chunks.map((chunk, i) => {
+      const embedding = embeddings[i];
+      return pool.query(
+        "INSERT INTO documents (content, document_name, embedding, user_id) VALUES ($1, $2, $3, $4)",
         [
-          chunks[i],
+          chunk,
           req.file.originalname,
           `[${embedding.join(",")}]`,
-          useId
+          userId
         ]
       );
-    }
+    });
+
+    await Promise.all(insertPromises);
 
     return res.json({
       message: "PDF processed & stored successfully",
@@ -69,8 +56,8 @@ const uploadPDF = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ error: "Failed to process PDF" });
+    console.error("Upload error detail:", error.message);
+    res.status(500).json({ error: "Failed to process PDF. Check server logs." });
   }
 };
 
