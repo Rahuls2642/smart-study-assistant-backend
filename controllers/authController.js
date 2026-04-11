@@ -2,7 +2,7 @@ import pool from "../db/index.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "your_secret_key"; 
+const JWT_SECRET = process.env.JWT_SECRET; 
 
 export const register = async (req, res) => {
   try {
